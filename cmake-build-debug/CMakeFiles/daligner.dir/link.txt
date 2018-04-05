@@ -1,0 +1,1 @@
+/usr/bin/cc -g   CMakeFiles/daligner.dir/align.c.o CMakeFiles/daligner.dir/daligner.c.o CMakeFiles/daligner.dir/DB.c.o CMakeFiles/daligner.dir/filter.c.o CMakeFiles/daligner.dir/QV.c.o  -o daligner -lpthread -lm 

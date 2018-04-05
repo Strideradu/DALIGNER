@@ -14,18 +14,18 @@
 #include "DB.h"
 #include "align.h"
 
-extern int    BIASED;
-extern int    VERBOSE;
-extern int    MINOVER;
-extern int    HGAP_MIN;
-extern int    SYMMETRIC;
-extern int    IDENTITY;
-extern char  *SORT_PATH;
+extern int BIASED;
+extern int VERBOSE;
+extern int MINOVER;
+extern int HGAP_MIN;
+extern int SYMMETRIC;
+extern int IDENTITY;
+extern char *SORT_PATH;
 
 extern uint64 MEM_LIMIT;
 extern uint64 MEM_PHYSICAL;
 
-int Set_Filter_Params(int kmer, int binshift, int suppress, int hitmin, int nthreads); 
+int Set_Filter_Params(int kmer, int binshift, int suppress, int hitmin, int nthreads);
 
 void *Sort_Kmers(DAZZ_DB *block, int *len);
 

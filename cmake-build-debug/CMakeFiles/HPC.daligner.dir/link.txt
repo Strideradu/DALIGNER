@@ -1,0 +1,1 @@
+/usr/bin/cc -g   CMakeFiles/HPC.daligner.dir/HPC.daligner.c.o CMakeFiles/HPC.daligner.dir/DB.c.o CMakeFiles/HPC.daligner.dir/QV.c.o  -o HPC.daligner -lm 

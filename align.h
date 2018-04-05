@@ -19,7 +19,7 @@
 #include "DB.h"
 
 #define TRACE_XOVR 125   //  If the trace spacing is not more than this value, then can
-                         //    and do compress traces pts to 8-bit unsigned ints
+//    and do compress traces pts to 8-bit unsigned ints
 
 /*** INTERACTIVE vs BATCH version
 
@@ -86,13 +86,13 @@
 
 ***/
 
-typedef struct
-  { void     *trace;
-    int       tlen;
-    int       diffs;
-    int       abpos, bbpos;
-    int       aepos, bepos;
-  } Path;
+typedef struct {
+    void *trace;
+    int tlen;
+    int diffs;
+    int abpos, bbpos;
+    int aepos, bepos;
+} Path;
 
 
 /*** ALIGNMENT ABSTRACTION:
@@ -142,169 +142,174 @@ typedef struct
 
 #define ELIM(x)  ((x) & ELIM_FLAG)
 
-typedef struct
-  { Path   *path;
-    uint32  flags;        /* Pipeline status and complementation flags          */
-    char   *aseq;         /* Pointer to A sequence                              */
-    char   *bseq;         /* Pointer to B sequence                              */
-    int     alen;         /* Length of A sequence                               */
-    int     blen;         /* Length of B sequence                               */
-  } Alignment;
+typedef struct {
+    Path *path;
+    uint32 flags;        /* Pipeline status and complementation flags          */
+    char *aseq;         /* Pointer to A sequence                              */
+    char *bseq;         /* Pointer to B sequence                              */
+    int alen;         /* Length of A sequence                               */
+    int blen;         /* Length of B sequence                               */
+} Alignment;
 
 void Complement_Seq(char *a, int n);
 
-  /* Many routines like Local_Alignment, Compute_Trace, and Print_Alignment need working
-     storage that is more efficiently reused with each call, rather than being allocated anew
-     with each call.  Each *thread* can create a Work_Data object with New_Work_Data and this
-     object holds and retains the working storage for routines of this module between calls
-     to the routines.  If enough memory for a Work_Data is not available then NULL is returned.
-     Free_Work_Data frees a Work_Data object and all working storage held by it.
-  */
+/* Many routines like Local_Alignment, Compute_Trace, and Print_Alignment need working
+   storage that is more efficiently reused with each call, rather than being allocated anew
+   with each call.  Each *thread* can create a Work_Data object with New_Work_Data and this
+   object holds and retains the working storage for routines of this module between calls
+   to the routines.  If enough memory for a Work_Data is not available then NULL is returned.
+   Free_Work_Data frees a Work_Data object and all working storage held by it.
+*/
 
-  typedef void Work_Data;
+typedef void Work_Data;
 
-  Work_Data *New_Work_Data();
+Work_Data *New_Work_Data();
 
-  void       Free_Work_Data(Work_Data *work);
+void Free_Work_Data(Work_Data *work);
 
-  /* Local_Alignment seeks local alignments of a quality determined by a number of parameters.
-     These are coded in an Align_Spec object that can be created with New_Align_Spec and
-     freed with Free_Align_Spec when no longer needed.  There are 4 essential parameters:
+/* Local_Alignment seeks local alignments of a quality determined by a number of parameters.
+   These are coded in an Align_Spec object that can be created with New_Align_Spec and
+   freed with Free_Align_Spec when no longer needed.  There are 4 essential parameters:
 
-     ave_corr:    the average correlation (1 - 2*error_rate) for the sought alignments.  For Pacbio
-                    data we set this to .70 assuming an average of 15% error in each read.
-     trace_space: the spacing interval for keeping trace points and segment differences (see
-                    description of 'trace' for Paths above)
-     freq[4]:     a 4-element vector where afreq[0] = frequency of A, f(A), freq[1] = f(C),
-                    freq[2] = f(G), and freq[3] = f(T).  This vector is part of the header
-                    of every DAZZ database (see db.h).
-     reach:       a boolean, if set alignment extend to the boundary when reasonable, otherwise
-                    the terminate only at suffix-positive points.
+   ave_corr:    the average correlation (1 - 2*error_rate) for the sought alignments.  For Pacbio
+                  data we set this to .70 assuming an average of 15% error in each read.
+   trace_space: the spacing interval for keeping trace points and segment differences (see
+                  description of 'trace' for Paths above)
+   freq[4]:     a 4-element vector where afreq[0] = frequency of A, f(A), freq[1] = f(C),
+                  freq[2] = f(G), and freq[3] = f(T).  This vector is part of the header
+                  of every DAZZ database (see db.h).
+   reach:       a boolean, if set alignment extend to the boundary when reasonable, otherwise
+                  the terminate only at suffix-positive points.
 
-     If an alignment cannot reach the boundary of the d.p. matrix with this condition (i.e.
-     overlap), then the last/first 30 columns of the alignment are guaranteed to be
-     suffix/prefix positive at correlation ave_corr * g(freq) where g is an empirically
-     measured function that increases from 1 as the entropy of freq decreases.  If memory is
-     unavailable or the freq distribution is too skewed then NULL is returned.
+   If an alignment cannot reach the boundary of the d.p. matrix with this condition (i.e.
+   overlap), then the last/first 30 columns of the alignment are guaranteed to be
+   suffix/prefix positive at correlation ave_corr * g(freq) where g is an empirically
+   measured function that increases from 1 as the entropy of freq decreases.  If memory is
+   unavailable or the freq distribution is too skewed then NULL is returned.
 
-     You can get back the original parameters used to create an Align_Spec with the simple
-     utility functions below.
-  */
+   You can get back the original parameters used to create an Align_Spec with the simple
+   utility functions below.
+*/
 
-  typedef void Align_Spec;
+typedef void Align_Spec;
 
-  Align_Spec *New_Align_Spec(double ave_corr, int trace_space, float *freq, int reach);
+Align_Spec *New_Align_Spec(double ave_corr, int trace_space, float *freq, int reach);
 
-  void        Free_Align_Spec(Align_Spec *spec);
+void Free_Align_Spec(Align_Spec *spec);
 
-  int    Trace_Spacing      (Align_Spec *spec);
-  double Average_Correlation(Align_Spec *spec);
-  float *Base_Frequencies   (Align_Spec *spec);
-  int    Overlap_If_Possible(Align_Spec *spec);
+int Trace_Spacing(Align_Spec *spec);
 
-  /* Local_Alignment finds the longest significant local alignment between the sequences in
-     'align' subject to:
+double Average_Correlation(Align_Spec *spec);
 
-       (a) the alignment criterion given by the Align_Spec 'spec',
-       (b) it passes through one of the points (anti+k)/2,(anti-k)/2 for k in [low,hgh] within
-             the underlying dynamic programming matrix (i.e. the points on diagonals low to hgh
-             on anti-diagonal anti or anti-1 (depending on whether the diagonal is odd or even)),
-       (c) if lbord >= 0, then the alignment is always above diagonal low-lbord, and
-       (d) if hbord >= 0, then the alignment is always below diagonal hgh+hbord.
+float *Base_Frequencies(Align_Spec *spec);
 
-     The path record of 'align' has its 'trace' filled from the point of view of an overlap
-     between the aread and the bread.  In addition a Path record from the point of view of the
-     bread versus the aread is returned by the function, with this Path's 'trace' filled in
-     appropriately.  The space for the returned path and the two 'trace's are in the working
-     storage supplied by the Work_Data packet and this space is reused with each call, so if
-     one wants to retain the bread-path and the two trace point sequences, then they must be
-     copied to user-allocated storage before calling the routine again.  NULL is returned in
-     the event of an error.
+int Overlap_If_Possible(Align_Spec *spec);
 
-     Find_Extension is a variant of Local_Alignment that simply finds a local alignment that
-     either ends (if prefix is non-zero) or begins (if prefix is zero) at the point
-     (anti+diag)/2,(anti-diag)/2).  All other parameters are as before.  It returns a non-zero
-     value only when INTERACTIVE is on and it cannot allocate the memory it needs.
-     Only the path and trace with respect to the aread is returned.  This routine is experimental
-     and may not persist in later versions of the code.
-  */
+/* Local_Alignment finds the longest significant local alignment between the sequences in
+   'align' subject to:
 
-  Path *Local_Alignment(Alignment *align, Work_Data *work, Align_Spec *spec,
-                        int low, int hgh, int anti, int lbord, int hbord);
+     (a) the alignment criterion given by the Align_Spec 'spec',
+     (b) it passes through one of the points (anti+k)/2,(anti-k)/2 for k in [low,hgh] within
+           the underlying dynamic programming matrix (i.e. the points on diagonals low to hgh
+           on anti-diagonal anti or anti-1 (depending on whether the diagonal is odd or even)),
+     (c) if lbord >= 0, then the alignment is always above diagonal low-lbord, and
+     (d) if hbord >= 0, then the alignment is always below diagonal hgh+hbord.
 
-  int   Find_Extension(Alignment *align, Work_Data *work, Align_Spec *spec,    //  experimental !!
-                       int diag, int anti, int lbord, int hbord, int prefix);
+   The path record of 'align' has its 'trace' filled from the point of view of an overlap
+   between the aread and the bread.  In addition a Path record from the point of view of the
+   bread versus the aread is returned by the function, with this Path's 'trace' filled in
+   appropriately.  The space for the returned path and the two 'trace's are in the working
+   storage supplied by the Work_Data packet and this space is reused with each call, so if
+   one wants to retain the bread-path and the two trace point sequences, then they must be
+   copied to user-allocated storage before calling the routine again.  NULL is returned in
+   the event of an error.
 
-  /* Given a legitimate Alignment object, Compute_Trace_X computes an exact trace for the alignment.
-     If 'path.trace' is non-NULL, then it is assumed to be a sequence of pass-through points
-     and diff levels computed by Local_Alignment.  In either case 'path.trace' is set
-     to point at an integer array within the storage of the Work_Data packet encoding an
-     exact optimal trace from the start to end points.  If the trace is needed beyond the
-     next call to a routine that sets it, then it should be copied to an array allocated
-     and managed by the caller.
+   Find_Extension is a variant of Local_Alignment that simply finds a local alignment that
+   either ends (if prefix is non-zero) or begins (if prefix is zero) at the point
+   (anti+diag)/2,(anti-diag)/2).  All other parameters are as before.  It returns a non-zero
+   value only when INTERACTIVE is on and it cannot allocate the memory it needs.
+   Only the path and trace with respect to the aread is returned.  This routine is experimental
+   and may not persist in later versions of the code.
+*/
 
-     Compute_Trace_ALL does not require a sequence of pass-through points, as it computes the
-     best alignment between (path->abpos,path->bbpos) and (path->aepos,path->bepos) in the
-     edit graph between the sequences.  Compute_Trace_PTS computes a trace by computing the
-     trace between successive pass through points.  It is much, much faster than Compute_Trace_ALL
-     but at the tradeoff of not necessarily being optimal as pass-through points are not all
-     perfect.  Compute_Trace_MID computes a trace by computing the trace between the mid-points
-     of alignments between two adjacent pairs of pass through points.  It is generally twice as
-     slow as Compute_Trace_PTS, but it produces nearer optimal alignments.  All these routines
-     return 1 if an error occurred and 0 otherwise.
-  */
+Path *Local_Alignment(Alignment *align, Work_Data *work, Align_Spec *spec,
+                      int low, int hgh, int anti, int lbord, int hbord);
+
+int Find_Extension(Alignment *align, Work_Data *work, Align_Spec *spec,    //  experimental !!
+                   int diag, int anti, int lbord, int hbord, int prefix);
+
+/* Given a legitimate Alignment object, Compute_Trace_X computes an exact trace for the alignment.
+   If 'path.trace' is non-NULL, then it is assumed to be a sequence of pass-through points
+   and diff levels computed by Local_Alignment.  In either case 'path.trace' is set
+   to point at an integer array within the storage of the Work_Data packet encoding an
+   exact optimal trace from the start to end points.  If the trace is needed beyond the
+   next call to a routine that sets it, then it should be copied to an array allocated
+   and managed by the caller.
+
+   Compute_Trace_ALL does not require a sequence of pass-through points, as it computes the
+   best alignment between (path->abpos,path->bbpos) and (path->aepos,path->bepos) in the
+   edit graph between the sequences.  Compute_Trace_PTS computes a trace by computing the
+   trace between successive pass through points.  It is much, much faster than Compute_Trace_ALL
+   but at the tradeoff of not necessarily being optimal as pass-through points are not all
+   perfect.  Compute_Trace_MID computes a trace by computing the trace between the mid-points
+   of alignments between two adjacent pairs of pass through points.  It is generally twice as
+   slow as Compute_Trace_PTS, but it produces nearer optimal alignments.  All these routines
+   return 1 if an error occurred and 0 otherwise.
+*/
 
 #define LOWERMOST -1   //   Possible modes for "mode" parameter below)
 #define GREEDIEST  0
 #define UPPERMOST  1
 
-  int Compute_Trace_ALL(Alignment *align, Work_Data *work);
-  int Compute_Trace_PTS(Alignment *align, Work_Data *work, int trace_spacing, int mode);
-  int Compute_Trace_MID(Alignment *align, Work_Data *work, int trace_spacing, int mode);
+int Compute_Trace_ALL(Alignment *align, Work_Data *work);
 
-  /* Compute_Trace_IRR (IRR for IRRegular) computes a trace for the given alignment where
-     it assumes the spacing between trace points between both the A and B read varies, and
-     futher assumes that the A-spacing is given in the short integers normally occupied by
-     the differences in the alignment between the trace points.  This routine is experimental
-     and may not persist in later versions of the code.
-  */
+int Compute_Trace_PTS(Alignment *align, Work_Data *work, int trace_spacing, int mode);
 
-  int Compute_Trace_IRR(Alignment *align, Work_Data *work, int mode);   //  experimental !!
+int Compute_Trace_MID(Alignment *align, Work_Data *work, int trace_spacing, int mode);
 
-  /* Alignment_Cartoon prints an ASCII representation of the overlap relationhip between the
-     two reads of 'align' to the given 'file' indented by 'indent' space.  Coord controls
-     the display width of numbers, it must be not less than the width of any number to be
-     displayed.
+/* Compute_Trace_IRR (IRR for IRRegular) computes a trace for the given alignment where
+   it assumes the spacing between trace points between both the A and B read varies, and
+   futher assumes that the A-spacing is given in the short integers normally occupied by
+   the differences in the alignment between the trace points.  This routine is experimental
+   and may not persist in later versions of the code.
+*/
 
-     If the alignment trace is an exact trace, then one can ask Print_Alignment to print an
-     ASCII representation of the alignment 'align' to the file 'file'.  Indent the display
-     by "indent" spaces and put "width" columns per line in the display.  Show "border"
-     characters of sequence on each side of the aligned region.  If upper is non-zero then
-     display bases in upper case.  If coord is greater than 0, then the positions of the
-     first character in A and B in the given row is displayed with a field width given by
-     coord's value.
+int Compute_Trace_IRR(Alignment *align, Work_Data *work, int mode);   //  experimental !!
 
-     Print_Reference is like Print_Alignment but rather than printing exaclty "width" columns
-     per segment, it prints "block" characters of the A sequence in each segment.  This results
-     in segments of different lengths, but is convenient when looking at two alignments involving
-     A as segments are guaranteed to cover the same interval of A in a segment.
+/* Alignment_Cartoon prints an ASCII representation of the overlap relationhip between the
+   two reads of 'align' to the given 'file' indented by 'indent' space.  Coord controls
+   the display width of numbers, it must be not less than the width of any number to be
+   displayed.
 
-     Both Print routines return 1 if an error occurred (not enough memory), and 0 otherwise.
+   If the alignment trace is an exact trace, then one can ask Print_Alignment to print an
+   ASCII representation of the alignment 'align' to the file 'file'.  Indent the display
+   by "indent" spaces and put "width" columns per line in the display.  Show "border"
+   characters of sequence on each side of the aligned region.  If upper is non-zero then
+   display bases in upper case.  If coord is greater than 0, then the positions of the
+   first character in A and B in the given row is displayed with a field width given by
+   coord's value.
 
-     Flip_Alignment modifies align so the roles of A and B are reversed.  If full is off then
-     the trace is ignored, otherwise the trace must be to a full alignment trace and this trace
-     is also appropriately inverted.
-  */
+   Print_Reference is like Print_Alignment but rather than printing exaclty "width" columns
+   per segment, it prints "block" characters of the A sequence in each segment.  This results
+   in segments of different lengths, but is convenient when looking at two alignments involving
+   A as segments are guaranteed to cover the same interval of A in a segment.
 
-  void Alignment_Cartoon(FILE *file, Alignment *align, int indent, int coord);
+   Both Print routines return 1 if an error occurred (not enough memory), and 0 otherwise.
 
-  int  Print_Alignment(FILE *file, Alignment *align, Work_Data *work,
-                       int indent, int width, int border, int upper, int coord);
+   Flip_Alignment modifies align so the roles of A and B are reversed.  If full is off then
+   the trace is ignored, otherwise the trace must be to a full alignment trace and this trace
+   is also appropriately inverted.
+*/
 
-  int  Print_Reference(FILE *file, Alignment *align, Work_Data *work,
-                       int indent, int block, int border, int upper, int coord);
+void Alignment_Cartoon(FILE *file, Alignment *align, int indent, int coord);
 
-  void Flip_Alignment(Alignment *align, int full);
+int Print_Alignment(FILE *file, Alignment *align, Work_Data *work,
+                    int indent, int width, int border, int upper, int coord);
+
+int Print_Reference(FILE *file, Alignment *align, Work_Data *work,
+                    int indent, int block, int border, int upper, int coord);
+
+void Flip_Alignment(Alignment *align, int full);
 
 
 /*** OVERLAP ABSTRACTION:
@@ -319,43 +324,46 @@ void Complement_Seq(char *a, int n);
 ***/
 
 typedef struct {
-  Path    path;         /* Path: begin- and end-point of alignment + diffs    */
-  uint32  flags;        /* Pipeline status and complementation flags          */
-  int     aread;        /* Id # of A sequence                                 */
-  int     bread;        /* Id # of B sequence                                 */
+    Path path;         /* Path: begin- and end-point of alignment + diffs    */
+    uint32 flags;        /* Pipeline status and complementation flags          */
+    int aread;        /* Id # of A sequence                                 */
+    int bread;        /* Id # of B sequence                                 */
 } Overlap;
 
 
-  /* Read_Overlap reads the next Overlap record from stream 'input', not including the trace
-     (if any), and without modifying 'ovl's trace pointer.  Read_Trace reads the ensuing trace
-     into the memory pointed at by the trace field of 'ovl'.  It is assumed to be big enough to
-     accommodate the trace where each value take 'tbytes' bytes (1 if uint8 or 2 if uint16).
+/* Read_Overlap reads the next Overlap record from stream 'input', not including the trace
+   (if any), and without modifying 'ovl's trace pointer.  Read_Trace reads the ensuing trace
+   into the memory pointed at by the trace field of 'ovl'.  It is assumed to be big enough to
+   accommodate the trace where each value take 'tbytes' bytes (1 if uint8 or 2 if uint16).
 
-     Write_Overlap write 'ovl' to stream 'output' followed by its trace vector (if any) that
-     occupies 'tbytes' bytes per value.  It returns non-zero if there was an error writing.
+   Write_Overlap write 'ovl' to stream 'output' followed by its trace vector (if any) that
+   occupies 'tbytes' bytes per value.  It returns non-zero if there was an error writing.
 
-     Print_Overlap prints an ASCII version of the contents of 'ovl' to stream 'output'
-     where the trace occupes 'tbytes' per value and the print out is indented from the left
-     margin by 'indent' spaces.
+   Print_Overlap prints an ASCII version of the contents of 'ovl' to stream 'output'
+   where the trace occupes 'tbytes' per value and the print out is indented from the left
+   margin by 'indent' spaces.
 
-     Compress_TraceTo8 converts a trace fo 16-bit values to 8-bit values in place, and
-     Decompress_TraceTo16 does the reverse conversion.
+   Compress_TraceTo8 converts a trace fo 16-bit values to 8-bit values in place, and
+   Decompress_TraceTo16 does the reverse conversion.
 
-     Check_Trace_Points checks that the number of trace points is correct and that the sum
-     of the b-read displacements equals the b-read alignment interval, assuming the trace
-     spacing is 'tspace'.  It reports an error message if there is a problem and 'verbose'
-     is non-zero.  The 'ovl' came from the file names 'fname'.
-  */
+   Check_Trace_Points checks that the number of trace points is correct and that the sum
+   of the b-read displacements equals the b-read alignment interval, assuming the trace
+   spacing is 'tspace'.  It reports an error message if there is a problem and 'verbose'
+   is non-zero.  The 'ovl' came from the file names 'fname'.
+*/
 
-  int Read_Overlap(FILE *input, Overlap *ovl);
-  int Read_Trace(FILE *innput, Overlap *ovl, int tbytes);
+int Read_Overlap(FILE *input, Overlap *ovl);
 
-  int  Write_Overlap(FILE *output, Overlap *ovl, int tbytes);
-  void Print_Overlap(FILE *output, Overlap *ovl, int tbytes, int indent);
+int Read_Trace(FILE *innput, Overlap *ovl, int tbytes);
 
-  void Compress_TraceTo8(Overlap *ovl);
-  void Decompress_TraceTo16(Overlap *ovl);
+int Write_Overlap(FILE *output, Overlap *ovl, int tbytes);
 
-  int  Check_Trace_Points(Overlap *ovl, int tspace, int verbose, char *fname);
+void Print_Overlap(FILE *output, Overlap *ovl, int tbytes, int indent);
+
+void Compress_TraceTo8(Overlap *ovl);
+
+void Decompress_TraceTo16(Overlap *ovl);
+
+int Check_Trace_Points(Overlap *ovl, int tspace, int verbose, char *fname);
 
 #endif // _A_MODULE
